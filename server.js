@@ -4,7 +4,7 @@ const cors = require("cors");
 const fs = require("fs");
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000; // Use Render's environment port if available
 
 // Enable CORS for all origins
 app.use(cors());
@@ -15,6 +15,11 @@ app.use(express.json());
 // Define path to the data file (purchased seconds)
 const dataFilePath = "./purchasedseconds.json";
 
+// Root route to test the server is running
+app.get("/", (req, res) => {
+  res.send("Welcome to the Seconds for Sale API!");
+});
+
 // Route to fetch purchased seconds
 app.get("/purchasedSeconds", (req, res) => {
   fs.readFile(dataFilePath, (err, data) => {
@@ -24,8 +29,6 @@ app.get("/purchasedSeconds", (req, res) => {
 
     // Parse the JSON data or return an empty object if the file is empty
     const parsedData = JSON.parse(data || "{}");
-
-    // Send the parsed data back as JSON
     res.json(parsedData);
   });
 });
@@ -34,7 +37,6 @@ app.get("/purchasedSeconds", (req, res) => {
 app.post("/purchaseSecond", (req, res) => {
   const { time, message } = req.body;
 
-  // Ensure the time and message are provided
   if (!time || !message) {
     return res.status(400).send("Time and message are required.");
   }
@@ -47,7 +49,6 @@ app.post("/purchaseSecond", (req, res) => {
 
     const purchasedSeconds = JSON.parse(data || "{}");
 
-    // Check if the second has already been purchased
     if (purchasedSeconds[time]) {
       return res.status(400).send("This second is already purchased!");
     }
@@ -55,19 +56,16 @@ app.post("/purchaseSecond", (req, res) => {
     // Add the new purchase
     purchasedSeconds[time] = message;
 
-    // Save the updated purchased seconds data back to the file
     fs.writeFile(dataFilePath, JSON.stringify(purchasedSeconds, null, 2), (err) => {
       if (err) {
         return res.status(500).send("Error saving the purchase.");
       }
-      
-      // Send success message
       res.send(`You successfully purchased ${time} with message: "${message}"`);
     });
   });
 });
 
-// Start the server and listen on the specified port
+// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
