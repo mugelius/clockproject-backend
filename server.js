@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios");
+const bodyParser = require("body-parser");
 
 const app = express();
 const port = process.env.PORT || 3000; // Use Render's environment port if available
@@ -11,6 +13,9 @@ app.use(cors());
 
 // Parse incoming JSON requests
 app.use(express.json());
+
+// Parse URL-encoded data (for IPN handling)
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Define path to the data file (purchased seconds)
 const dataFilePath = path.join(__dirname, 'purchasedseconds.json');
@@ -93,6 +98,74 @@ app.post("/purchaseSecond", (req, res) => {
     });
   });
 });
+
+// IPN listener endpoint to receive PayPal IPN notifications
+app.post("/ipn", async (req, res) => {
+  const ipnMessage = req.body;
+
+  // Step 1: Verify the IPN message with PayPal
+  try {
+    const verificationResponse = await axios.post('https://ipnpb.sandbox.paypal.com/cgi-bin/webscr', null, {
+      params: {
+        cmd: '_notify-validate',
+        ...ipnMessage, // Include the entire IPN message for validation
+      },
+    });
+
+    if (verificationResponse.data === 'VERIFIED') {
+      // Step 2: Process the IPN data
+      if (ipnMessage.payment_status === 'Completed') {
+        // The payment is completed, process the data
+        const payerEmail = ipnMessage.payer_email;
+        const amount = ipnMessage.mc_gross;
+
+        // Step 3: Update the purchased seconds or your database
+        updatePurchasedSeconds(payerEmail, amount);
+
+        // Respond to PayPal with "OK" to acknowledge receipt
+        res.send('OK');
+      } else {
+        res.send('Payment not completed.');
+      }
+    } else {
+      res.send('IPN Verification Failed');
+    }
+  } catch (error) {
+    console.error('Error processing IPN:', error);
+    res.send('Error processing IPN');
+  }
+});
+
+// Function to update purchased seconds (basic example)
+const updatePurchasedSeconds = (payerEmail, amount) => {
+  fs.readFile(dataFilePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading the purchased seconds file:', err);
+      return;
+    }
+
+    let purchasedSeconds = {};
+
+    try {
+      purchasedSeconds = JSON.parse(data || '{}');
+    } catch (error) {
+      console.error('Error parsing JSON:', error);
+      return;
+    }
+
+    // Update or add the payer's seconds purchase data
+    purchasedSeconds[payerEmail] = (purchasedSeconds[payerEmail] || 0) + amount;
+
+    // Write the updated data back to the file
+    fs.writeFile(dataFilePath, JSON.stringify(purchasedSeconds, null, 2), (err) => {
+      if (err) {
+        console.error('Error updating the purchased seconds file:', err);
+      } else {
+        console.log('Successfully updated purchased seconds for', payerEmail);
+      }
+    });
+  });
+};
 
 // Start the server
 app.listen(port, () => {
