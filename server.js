@@ -1,3 +1,16 @@
+const express = require("express"); // Import Express
+const fs = require("fs"); // Import File System module
+const cors = require("cors"); // Import CORS middleware
+
+const app = express(); // Initialize Express application
+const port = process.env.PORT || 3000; // Set the port (Render assigns a port dynamically)
+
+app.use(cors()); // Enable CORS
+app.use(express.json()); // Middleware to parse JSON bodies
+
+// Path to the JSON file
+const dataFilePath = "./purchasedseconds.json";
+
 // Route to fetch purchased seconds
 app.get("/purchasedSeconds", (req, res) => {
   fs.readFile(dataFilePath, (err, data) => {
@@ -6,7 +19,6 @@ app.get("/purchasedSeconds", (req, res) => {
       return res.status(500).send("Error reading the file.");
     }
 
-    // Handle empty or malformed data
     let parsedData;
     try {
       parsedData = JSON.parse(data);
@@ -15,7 +27,6 @@ app.get("/purchasedSeconds", (req, res) => {
       return res.status(500).send("Malformed data in purchasedseconds.json.");
     }
 
-    // If the file is empty, send an empty object
     if (!parsedData) {
       parsedData = {};
     }
@@ -32,7 +43,6 @@ app.post("/purchaseSecond", (req, res) => {
     return res.status(400).send("Time and message are required.");
   }
 
-  // Read the current purchased seconds data
   fs.readFile(dataFilePath, (err, data) => {
     if (err) {
       console.error("Error reading the purchased seconds file:", err);
@@ -51,7 +61,6 @@ app.post("/purchaseSecond", (req, res) => {
       return res.status(400).send("This second is already purchased!");
     }
 
-    // Add the new purchase
     purchasedSeconds[time] = message;
 
     fs.writeFile(dataFilePath, JSON.stringify(purchasedSeconds, null, 2), (err) => {
@@ -62,4 +71,9 @@ app.post("/purchaseSecond", (req, res) => {
       res.send(`You successfully purchased ${time} with message: "${message}"`);
     });
   });
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
