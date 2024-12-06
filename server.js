@@ -1,34 +1,25 @@
-// Import necessary modules
-const express = require("express");
-const cors = require("cors");
-const fs = require("fs");
-
-const app = express();
-const port = process.env.PORT || 3000; // Use Render's environment port if available
-
-// Enable CORS for all origins
-app.use(cors());
-
-// Parse incoming JSON requests
-app.use(express.json());
-
-// Define path to the data file (purchased seconds)
-const dataFilePath = "./purchasedseconds.json";
-
-// Root route to test the server is running
-app.get("/", (req, res) => {
-  res.send("Welcome to the Seconds for Sale API!");
-});
-
 // Route to fetch purchased seconds
 app.get("/purchasedSeconds", (req, res) => {
   fs.readFile(dataFilePath, (err, data) => {
     if (err) {
+      console.error("Error reading the purchased seconds file:", err);
       return res.status(500).send("Error reading the file.");
     }
 
-    // Parse the JSON data or return an empty object if the file is empty
-    const parsedData = JSON.parse(data || "{}");
+    // Handle empty or malformed data
+    let parsedData;
+    try {
+      parsedData = JSON.parse(data);
+    } catch (error) {
+      console.error("Error parsing purchased seconds file:", error);
+      return res.status(500).send("Malformed data in purchasedseconds.json.");
+    }
+
+    // If the file is empty, send an empty object
+    if (!parsedData) {
+      parsedData = {};
+    }
+
     res.json(parsedData);
   });
 });
@@ -44,10 +35,17 @@ app.post("/purchaseSecond", (req, res) => {
   // Read the current purchased seconds data
   fs.readFile(dataFilePath, (err, data) => {
     if (err) {
+      console.error("Error reading the purchased seconds file:", err);
       return res.status(500).send("Error reading the file.");
     }
 
-    const purchasedSeconds = JSON.parse(data || "{}");
+    let purchasedSeconds = {};
+    try {
+      purchasedSeconds = JSON.parse(data);
+    } catch (error) {
+      console.error("Error parsing purchased seconds file:", error);
+      return res.status(500).send("Malformed data in purchasedseconds.json.");
+    }
 
     if (purchasedSeconds[time]) {
       return res.status(400).send("This second is already purchased!");
@@ -58,14 +56,10 @@ app.post("/purchaseSecond", (req, res) => {
 
     fs.writeFile(dataFilePath, JSON.stringify(purchasedSeconds, null, 2), (err) => {
       if (err) {
+        console.error("Error writing to purchased seconds file:", err);
         return res.status(500).send("Error saving the purchase.");
       }
       res.send(`You successfully purchased ${time} with message: "${message}"`);
     });
   });
-});
-
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
 });
